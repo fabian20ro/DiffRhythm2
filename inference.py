@@ -73,7 +73,7 @@ def prepare_model(repo_id, device):
     )
     diffrhythm2_config_path = hf_hub_download(
         repo_id=repo_id,
-        filename="model.json",
+        filename="config.json",
         local_dir="./ckpt",
         local_files_only=False,
     )
