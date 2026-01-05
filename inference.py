@@ -219,7 +219,12 @@ if __name__ == "__main__":
     input_jsonl = args.input_jsonl
     cfg_strength = args.cfg_strength
     max_secs = args.max_secs
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        device = torch.device('mps')
+    else:
+        device = torch.device('cpu')
     dtype = torch.float16
 
     # load diffrhythm2
@@ -278,5 +283,4 @@ if __name__ == "__main__":
             cfg_strength=cfg_strength,
             fake_stereo=args.fake_stereo,
         )
-
 

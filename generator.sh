@@ -1,6 +1,30 @@
 #!/bin/bash
 set -euo pipefail
 
+export PYTHONPATH=$PYTHONPATH:$PWD
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  cat <<'EOF'
+Usage: ./generator.sh path/to/song.lrc [style prompt]
+
+Inputs:
+  path/to/song.lrc   Lyrics file; outputs are written next to this file.
+  style prompt       Optional text prompt; if missing, a same-named .wav
+                     next to the .lrc is used as the style prompt.
+
+Expected assets:
+  path/to/song.png   Optional; when present enables mp4 creation.
+
+Outputs:
+  path/to/song.jsonl
+  path/to/song.mp3
+  path/to/song.srt
+  path/to/song.mp4
+  path/to/song_final.mp4
+EOF
+  exit 0
+fi
+
 ffmpeg -version
 espeak-ng --version
 
