@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-export PYTHONPATH=$PYTHONPATH:$PWD
+#export PYTHONPATH=$PYTHONPATH:$PWD
 
 if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   cat <<'EOF'
