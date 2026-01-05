@@ -3,3 +3,4 @@ ckpt
 ckpts
 __pycache__
 .cache
+.venv
