@@ -36,6 +36,7 @@ SONG_NAME="$(basename "$LYRICS_PATH" .lrc)"
 JSONL_PATH="$RESULT_DIR/$SONG_NAME.jsonl"
 MP3_PATH="$RESULT_DIR/$SONG_NAME.mp3"
 SRT_PATH="$RESULT_DIR/$SONG_NAME.srt"
+ASS_PATH="$RESULT_DIR/$SONG_NAME.ass"
 PNG_LOCATION="$RESULT_DIR/$SONG_NAME.png"
 WAV_STYLE_PROMPT="$RESULT_DIR/$SONG_NAME.wav"
 VIDEO_PATH="$RESULT_DIR/$SONG_NAME.mp4"
@@ -80,36 +81,71 @@ else
   echo "mp3 exists, skipping: $MP3_PATH"
 fi
 
-if [ -f "$MP3_PATH" ] && [ ! -f "$SRT_PATH" ]; then
-  echo "generating srt: $SRT_PATH"
-  python - "$MP3_PATH" "$SRT_PATH" <<'PY'
+if [ -f "$MP3_PATH" ] && [ ! -f "$ASS_PATH" ]; then
+  echo "generating ass (karaoke): $ASS_PATH"
+  python - "$MP3_PATH" "$ASS_PATH" <<'PY'
 import sys
 from faster_whisper import WhisperModel
 
-audio_path, srt_path = sys.argv[1:3]
+audio_path, ass_path = sys.argv[1:3]
 model = WhisperModel("medium")
-segments, _info = model.transcribe(audio_path, language="en")
+segments, _info = model.transcribe(
+    audio_path,
+    language="en",
+    word_timestamps=True,
+)
 
-def format_timestamp(seconds):
-    milliseconds = int(round(seconds * 1000.0))
-    hours = milliseconds // 3600000
-    milliseconds %= 3600000
-    minutes = milliseconds // 60000
-    milliseconds %= 60000
-    secs = milliseconds // 1000
-    milliseconds %= 1000
-    return f"{hours:02d}:{minutes:02d}:{secs:02d},{milliseconds:03d}"
+def format_ass_timestamp(seconds):
+    total_cs = int(round(seconds * 100.0))
+    hours = total_cs // 360000
+    total_cs %= 360000
+    minutes = total_cs // 6000
+    total_cs %= 6000
+    secs = total_cs // 100
+    cs = total_cs % 100
+    return f"{hours:d}:{minutes:02d}:{secs:02d}.{cs:02d}"
 
-with open(srt_path, "w") as f:
-    for index, segment in enumerate(segments, start=1):
-        f.write(f"{index}\n")
-        f.write(f"{format_timestamp(segment.start)} --> {format_timestamp(segment.end)}\n")
-        f.write(f"{segment.text.strip()}\n\n")
+def karaoke_text(words):
+    parts = []
+    for word in words:
+        duration_cs = max(1, int(round((word.end - word.start) * 100.0)))
+        text = word.word.replace("\n", " ").replace("\r", " ").strip()
+        if not text:
+            continue
+        parts.append(r"{\k" + str(duration_cs) + "}" + text)
+    return " ".join(parts).strip()
+
+ass_header = """[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,52,&H00FFFFFF,&H0000FFFF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,3,0,2,80,80,60,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+
+with open(ass_path, "w") as f:
+    f.write(ass_header)
+    for segment in segments:
+        start = format_ass_timestamp(segment.start)
+        end = format_ass_timestamp(segment.end)
+        words = getattr(segment, "words", None) or []
+        if words:
+            text = karaoke_text(words)
+        else:
+            text = (segment.text or "").replace("\n", " ").replace("\r", " ").strip()
+        if not text:
+            continue
+        f.write(f"Dialogue: 0,{start},{end},Default,,0,0,0,,{text}\n")
 PY
-elif [ -f "$SRT_PATH" ]; then
-  echo "srt exists, skipping: $SRT_PATH"
+elif [ -f "$ASS_PATH" ]; then
+  echo "ass exists, skipping: $ASS_PATH"
 else
-  echo "missing mp3, skipping srt: $MP3_PATH"
+  echo "missing mp3, skipping ass: $MP3_PATH"
 fi
 
 if [ -f "$PNG_LOCATION" ]; then
@@ -125,15 +161,15 @@ if [ -f "$PNG_LOCATION" ]; then
     echo "missing mp3, skipping mp4: $MP3_PATH"
   fi
 
-  if [ -f "$VIDEO_PATH" ] && [ -f "$SRT_PATH" ] && [ ! -f "$VIDEO_FINAL_PATH" ]; then
+  if [ -f "$VIDEO_PATH" ] && [ -f "$ASS_PATH" ] && [ ! -f "$VIDEO_FINAL_PATH" ]; then
     echo "burning subtitles: $VIDEO_FINAL_PATH"
     ffmpeg -i "$VIDEO_PATH" \
-      -vf "subtitles=$SRT_PATH:force_style='Fontsize=36,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BorderStyle=1,Outline=2'" \
+      -vf "ass=$ASS_PATH" \
       -c:a copy "$VIDEO_FINAL_PATH"
   elif [ -f "$VIDEO_FINAL_PATH" ]; then
     echo "final mp4 exists, skipping: $VIDEO_FINAL_PATH"
   else
-    echo "missing mp4 or srt, skipping final mp4: $VIDEO_PATH / $SRT_PATH"
+    echo "missing mp4 or ass, skipping final mp4: $VIDEO_PATH / $ASS_PATH"
   fi
 else
   echo "missing png, skipping video: $PNG_LOCATION"
