@@ -76,7 +76,9 @@ PY
     --repo-id ASLP-lab/DiffRhythm2 \
     --output-dir "$RESULT_DIR" \
     --input-jsonl "$JSONL_PATH" \
-    --cfg-strength 2.0
+    --cfg-strength 0.8 \
+    --steps 48 \
+    --max-secs 420
 else
   echo "mp3 exists, skipping: $MP3_PATH"
 fi
@@ -174,4 +176,3 @@ if [ -f "$PNG_LOCATION" ]; then
 else
   echo "missing png, skipping video: $PNG_LOCATION"
 fi
-    
